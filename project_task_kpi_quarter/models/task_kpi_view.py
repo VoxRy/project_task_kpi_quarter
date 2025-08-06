@@ -43,16 +43,28 @@ class TaskKPI(models.Model):
                     (EXTRACT(QUARTER FROM COALESCE(t.done_date, t.create_date))::int)::text
                 ) AS quarter,
 
-                /* Stage dağılımları */
-                SUM(CASE WHEN st.is_closed IS DISTINCT FROM TRUE 
-                          AND lower(st.name) LIKE 'backlog%' THEN 1 ELSE 0 END) AS backlog_count,
+                /* Stage dağılımları (isimleri normalize ederek) */
+                SUM(CASE
+                        WHEN st.is_closed IS DISTINCT FROM TRUE
+                         AND lower(btrim(st.name)) LIKE 'backlog%%'
+                    THEN 1 ELSE 0 END
+                ) AS backlog_count,
 
-                SUM(CASE WHEN st.is_closed IS DISTINCT FROM TRUE 
-                          AND lower(st.name) LIKE 'to do%' THEN 1 ELSE 0 END) AS todo_count,
+                SUM(CASE
+                        WHEN st.is_closed IS DISTINCT FROM TRUE
+                         AND lower(btrim(st.name)) LIKE 'to do%%'
+                    THEN 1 ELSE 0 END
+                ) AS todo_count,
 
-                SUM(CASE WHEN st.is_closed IS DISTINCT FROM TRUE 
-                          AND lower(st.name) LIKE 'in progress%' THEN 1 ELSE 0 END) AS inprogress_count,
+                /* In Progress: kapalı değil + backlog/to do değil */
+                SUM(CASE
+                        WHEN st.is_closed IS DISTINCT FROM TRUE
+                         AND lower(btrim(st.name)) NOT LIKE 'backlog%%'
+                         AND lower(btrim(st.name)) NOT LIKE 'to do%%'
+                    THEN 1 ELSE 0 END
+                ) AS inprogress_count,
 
+                /* Done: kapalı */
                 SUM(CASE WHEN COALESCE(st.is_closed, FALSE) THEN 1 ELSE 0 END) AS done_count,
 
                 COUNT(*) AS total_count,
@@ -71,3 +83,53 @@ class TaskKPI(models.Model):
                 COALESCE(t.x_year, EXTRACT(YEAR FROM COALESCE(t.done_date, t.create_date))::int),
                 COALESCE(t.x_quarter::text, (EXTRACT(QUARTER FROM COALESCE(t.done_date, t.create_date))::int)::text)
         """)
+
+    # KPI satırındaki kriterlere göre project.task kayıtlarını aç (drill-down)
+    def action_open_tasks(self):
+        self.ensure_one()
+        domain = []
+        if self.user_id:
+            # project_task_user_rel -> tasks: user_ids (M2M)
+            domain.append(('user_ids', 'in', self.user_id.id))
+        if self.project_id:
+            domain.append(('project_id', '=', self.project_id.id))
+        if self.year:
+            domain.append(('x_year', '=', self.year))
+        if self.quarter:
+            domain.append(('x_quarter', '=', self.quarter))
+
+        metric = (self.env.context or {}).get('metric')
+
+        # Domain, SQL mantığıyla aynı olsun:
+        if metric == 'done':
+            domain.append(('stage_id.is_closed', '=', True))
+
+        elif metric == 'backlog':
+            domain += [
+                ('stage_id.is_closed', '!=', True),
+                ('stage_id.name', 'ilike', 'backlog%'),
+            ]
+
+        elif metric == 'todo':
+            domain += [
+                ('stage_id.is_closed', '!=', True),
+                ('stage_id.name', 'ilike', 'to do%'),
+            ]
+
+        elif metric == 'in_progress':
+            # Kapalı değil + adı backlog veya to do ile başlamıyor
+            domain += [
+                ('stage_id.is_closed', '!=', True),
+                ('stage_id.name', 'not ilike', 'backlog%'),
+                ('stage_id.name', 'not ilike', 'to do%'),
+            ]
+        # metric 'total' veya None ise ekstra stage filtresi yok
+
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Görevler',
+            'res_model': 'project.task',
+            'view_mode': 'tree,form',
+            'domain': domain,
+            'target': 'current',
+        }

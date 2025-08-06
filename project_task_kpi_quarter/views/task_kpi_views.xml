@@ -1,13 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+
   <!-- Action -->
   <record id="action_task_kpi" model="ir.actions.act_window">
     <field name="name">Proje Analizi - Çalışan KPI</field>
     <field name="res_model">project.task.kpi</field>
-    <field name="view_mode">pivot,graph</field>
-    <field name="context">{}</field>
+    <field name="view_mode">pivot,graph,tree</field>
+    <!-- Varsayılan: satır = Çalışan; ölçü = done_count -->
+    <field name="context">{'graph_measure': 'done_count', 'search_default_grp_user': 1}</field>
     <field name="help" type="html">
-      <p>Çalışan × Yıl × Çeyrek bazında görev dağılımı ve tamamlanma yüzdeleri.</p>
+      <p>KPI satırındaki bağlantılara tıklayarak ilgili görevleri listeleyebilirsiniz.</p>
+    </field>
+  </record>
+
+  <!-- Search -->
+  <record id="view_task_kpi_search" model="ir.ui.view">
+    <field name="name">project.task.kpi.search</field>
+    <field name="model">project.task.kpi</field>
+    <field name="arch" type="xml">
+      <search string="KPI Arama">
+        <field name="user_id"/>
+        <field name="project_id"/>
+        <field name="year"/>
+        <field name="quarter"/>
+        <separator/>
+        <filter string="Bu Yıl" name="flt_this_year" domain="[('year', '=', context_today().year)]"/>
+        <group expand="0" string="Grupla">
+          <!-- Bunların name'leri context ile tetiklenecek -->
+          <filter name="grp_user" string="Çalışan" context="{'group_by':'user_id'}"/>
+          <filter name="grp_project" string="Proje" context="{'group_by':'project_id'}"/>
+          <filter name="grp_year" string="Yıl" context="{'group_by':'year'}"/>
+          <filter name="grp_quarter" string="Çeyrek" context="{'group_by':'quarter'}"/>
+        </group>
+      </search>
     </field>
   </record>
 
@@ -16,17 +41,19 @@
     <field name="name">project.task.kpi.pivot</field>
     <field name="model">project.task.kpi</field>
     <field name="arch" type="xml">
-      <pivot string="KPI Pivot" disable_linking="1">
+      <pivot string="KPI Pivot">
+        <!-- Satır: Çalışan (varsayılan context ile aktif) -->
         <field name="user_id" type="row"/>
-        <field name="project_id" type="row" optional="show"/>
+        <field name="project_id" type="row" optional="hide"/>
+        <!-- Kolon: Zaman -->
         <field name="year" type="col"/>
         <field name="quarter" type="col"/>
+        <!-- Ölçüler -->
         <field name="total_count" type="measure"/>
         <field name="done_count" type="measure"/>
-        <field name="done_pct" type="measure"/>
-        <field name="backlog_count" type="measure"/>
-        <field name="todo_count" type="measure"/>
-        <field name="inprogress_count" type="measure"/>
+        <field name="backlog_count" type="measure" optional="hide"/>
+        <field name="todo_count" type="measure" optional="hide"/>
+        <field name="inprogress_count" type="measure" optional="hide"/>
       </pivot>
     </field>
   </record>
@@ -48,7 +75,40 @@
     </field>
   </record>
 
+  <!-- Tree: metrikler ve satır sonu butonlar -->
+  <record id="view_task_kpi_list" model="ir.ui.view">
+    <field name="name">project.task.kpi.list</field>
+    <field name="model">project.task.kpi</field>
+    <field name="arch" type="xml">
+      <tree string="KPI">
+        <field name="user_id"/>
+        <field name="project_id"/>
+        <field name="year"/>
+        <field name="quarter"/>
+        <field name="total_count"/>
+        <field name="done_count"/>
+        <field name="backlog_count"/>
+        <field name="todo_count"/>
+        <field name="inprogress_count"/>
+        <field name="done_pct"/>
+
+        <!-- Satır sonu: detaya git bağlantıları -->
+        <button name="action_open_tasks" type="object" class="oe_link"
+                string="Toplam" context="{'metric': 'total'}"/>
+        <button name="action_open_tasks" type="object" class="oe_link"
+                string="Done" context="{'metric': 'done'}"/>
+        <button name="action_open_tasks" type="object" class="oe_link"
+                string="Backlog" context="{'metric': 'backlog'}"/>
+        <button name="action_open_tasks" type="object" class="oe_link"
+                string="To Do" context="{'metric': 'todo'}"/>
+        <button name="action_open_tasks" type="object" class="oe_link"
+                string="In Progress" context="{'metric': 'in_progress'}"/>
+      </tree>
+    </field>
+  </record>
+
   <!-- Menü -->
   <menuitem id="menu_task_kpi_root" name="Proje Analizi" parent="project.menu_main_pm"/>
   <menuitem id="menu_task_kpi" name="Çalışan KPI" parent="menu_task_kpi_root" action="action_task_kpi"/>
+
 </odoo>
