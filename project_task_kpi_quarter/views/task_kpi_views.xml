@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <!-- Action -->
+  <record id="action_task_kpi" model="ir.actions.act_window">
+    <field name="name">Proje Analizi - Çalışan KPI</field>
+    <field name="res_model">project.task.kpi</field>
+    <field name="view_mode">pivot,graph</field>
+    <field name="context">{}</field>
+    <field name="help" type="html">
+      <p>Çalışan × Yıl × Çeyrek bazında görev dağılımı ve tamamlanma yüzdeleri.</p>
+    </field>
+  </record>
+
+  <!-- Pivot -->
+  <record id="view_task_kpi_pivot" model="ir.ui.view">
+    <field name="name">project.task.kpi.pivot</field>
+    <field name="model">project.task.kpi</field>
+    <field name="arch" type="xml">
+      <pivot string="KPI Pivot" disable_linking="1">
+        <field name="user_id" type="row"/>
+        <field name="project_id" type="row" optional="show"/>
+        <field name="year" type="col"/>
+        <field name="quarter" type="col"/>
+        <field name="total_count" type="measure"/>
+        <field name="done_count" type="measure"/>
+        <field name="done_pct" type="measure"/>
+        <field name="backlog_count" type="measure"/>
+        <field name="todo_count" type="measure"/>
+        <field name="inprogress_count" type="measure"/>
+      </pivot>
+    </field>
+  </record>
+
+  <!-- Graph -->
+  <record id="view_task_kpi_graph" model="ir.ui.view">
+    <field name="name">project.task.kpi.graph</field>
+    <field name="model">project.task.kpi</field>
+    <field name="arch" type="xml">
+      <graph string="KPI Grafiği" type="bar" stacked="1">
+        <field name="user_id" type="row"/>
+        <field name="year" type="col"/>
+        <field name="quarter" type="col"/>
+        <field name="done_count" type="measure"/>
+        <field name="inprogress_count" type="measure"/>
+        <field name="todo_count" type="measure"/>
+        <field name="backlog_count" type="measure"/>
+      </graph>
+    </field>
+  </record>
+
+  <!-- Menü -->
+  <menuitem id="menu_task_kpi_root" name="Proje Analizi" parent="project.menu_main_pm"/>
+  <menuitem id="menu_task_kpi" name="Çalışan KPI" parent="menu_task_kpi_root" action="action_task_kpi"/>
+</odoo>
